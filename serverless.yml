@@ -1,4 +1,4 @@
-service: notes-app-api
+service: notes-app-2-api
 
 # Create an optimized package for our functions
 package:
@@ -9,16 +9,20 @@ plugins:
   - serverless-offline
   - serverless-dotenv-plugin # Load .env as environment variables
 
+custom:
+  stage: ${opt:stage, self:provider.stage}
+  tableName: ${self:custom.stage}-notes
+
 provider:
   name: aws
   runtime: nodejs10.x
-  stage: prod
+  stage: dev
   region: us-east-2
 
   # These environment variables are made available to our functions
   # under process.env.
   environment:
-    tableName: notes
+    tableName: ${self:custom.tableName}
     stripeSecretKey: ${env:STRIPE_SECRET_KEY}
 
   # 'iamRoleStatements' defines the permission policy for the Lambda function.
@@ -33,7 +37,10 @@ provider:
         - dynamodb:PutItem
         - dynamodb:UpdateItem
         - dynamodb:DeleteItem
-      Resource: "arn:aws:dynamodb:us-east-2:*:*"
+      # Restrict our IAM role permissions to
+      # the specific table for the stage
+      Resource:
+        - "Fn::GetAtt": [NotesTable, Arn]
 
 functions:
   # Defines an HTTP API endpoint that calls the main function in create.js
@@ -97,4 +104,12 @@ functions:
           authorizer: aws_iam
 
 resources:
+  # API GATEWAY Errors
   - ${file(resources/api-gateway-errors.yml)}
+  # DynamoDB
+  - ${file(resources/dynamodb-table.yml)}
+  # S3
+  - ${file(resources/s3-bucket.yml)}
+  # Cognito
+  - ${file(resources/cognito-user-pool.yml)}
+  - ${file(resources/cognito-identity-pool.yml)}
